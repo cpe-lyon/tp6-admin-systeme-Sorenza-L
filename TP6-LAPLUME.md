@@ -208,6 +208,19 @@ Hex code (type L to list all codes): 8e
 root@serveur:~# pvcreate sdb1 /dev/sdb1
   Device sdb1 not found.
   Physical volume "/dev/sdb1" successfully created.
+
+  root@serveur:~# pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/sdb1
+  VG Name               VolumeGroupTest
+  PV Size               2,00 GiB / not usable 4,00 MiB
+  Allocatable           yes
+  PE Size               4,00 MiB
+  Total PE              511
+  Free PE               511
+  Allocated PE          0
+  PV UUID               Uo45Vr-QZQi-prWr-1cU7-V8cl-roY9-gRxCVx
+
 </pre>
 
 ### 4. A l’aide de la commande vgcreate, créez un groupe de volumes, qui pour l’instant ne contiendra que le volume physique créé à l’étape précédente. Vérifiez à l’aide de la commande vgdisplay. Par convention, on nomme généralement les groupes de volumes vgxx (où xx représente l’indice du groupe de volume, en commençant par 00, puis 01...)
@@ -215,34 +228,134 @@ root@serveur:~# pvcreate sdb1 /dev/sdb1
 <pre>
 root@serveur:~# vgcreate VolumeGroupTest /dev/sdb1
 Volume group "VolumeGroupTest" successfully created
+
+root@serveur:~# vgdisplay
+  --- Volume group ---
+  VG Name               VolumeGroupTest
+  System ID
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               <2,00 GiB
+  PE Size               4,00 MiB
+  Total PE              511
+  Alloc PE / Size       0 / 0
+  Free  PE / Size       511 / <2,00 GiB
+  VG UUID               OKvgg0-wzpI-mJuv-omSt-qicS-i9u9-FNo4Oy
 </pre>
 
 ### 5. Créez un volume logique appelé lvData occupant l’intégralité de l’espace disque disponible. On peut renseigner la taille d’un volume logique soit de manière absolue avec l’option -L (par exemple -L 10G pour créer un volume de 10 Gio), soit de manière relative avec l’option -l : -l 60%VG pour utiliser 60% de l’espace total du groupe de volumes, ou encore -l 100%FREE pour utiliser la totalité de l’espace libre.
 
+<pre>
+root@serveur:~# lvcreate -n lvdata -l  100%FREE VolumeGroupTest
+  Logical volume "lvdata" created.
 
+root@serveur:~# lvdisplay
+  --- Logical volume ---
+  LV Path                /dev/VolumeGroupTest/lvdata
+  LV Name                lvdata
+  VG Name                VolumeGroupTest
+  LV UUID                pdrcVB-8Y7z-NElN-1llu-Ewuu-xZ3o-jvXTAb
+  LV Write Access        read/write
+  LV Creation host, time serveur, 2019-10-14 19:27:01 +0000
+  LV Status              available
+  # open                 0
+  LV Size                <2,00 GiB
+  Current LE             511
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           253:0
+</pre>
 
 ### 6. Dans ce volume logique, créez une partition que vous formaterez en ext4, puis procédez comme dans l’exercice 1 pour qu’elle soit montée automatiquement, au démarrage de la machine, dans /data. A ce stade, l’utilité de LVM peut paraître limitée. Il trouve tout son intérêt quand on veut par exemple agrandir une partition à l’aide d’un nouveau disque.
 
+<pre>
+root@serveur:~# mkfs.ext4 /dev/VolumeGroupTest/lvdata
+mke2fs 1.44.6 (5-Mar-2019)
+Found a dos partition table in /dev/VolumeGroupTest/lvdata
+Proceed anyway? (y,N) y
+Creating filesystem with 523264 4k blocks and 130816 inodes
+Filesystem UUID: 7e728432-36a5-4429-a090-73fc0686608c
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376, 294912
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (8192 blocks): done
+Writing superblocks and filesystem accounting information: done
+</pre>
+
+modification du ficher /etc/fstab :
+<pre>
+Ajout de la ligne UUID=7e728432-36a5-4429-a090-73fc0686608c /ext4 defaults 0 0
+</pre>
+
+monter du volume :
+<pre>
+mount /dev/VolumeGroupTest/lvdata /data
+mount /dev/VolumeGroupTest/lvdata /data
+</pre>
+
 ### 7. Eteignez la VM pour ajouter un second disque (peu importe la taille pour cet exercice). Redémarrez la VM, vérifiez que le disque est bien présent. Puis, répétez les questions 2 et 3 sur ce nouveau disque.
+
+<pre>
+laplume@serveur:~$ lsblk
+NAME                       MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+loop0                        7:0    0 54,7M  1 loop /snap/lxd/12181
+loop1                        7:1    0 89,1M  1 loop /snap/core/7917
+loop2                        7:2    0 54,6M  1 loop /snap/lxd/11985
+loop3                        7:3    0   89M  1 loop /snap/core/7713
+sda                          8:0    0   10G  0 disk
+├─sda1                       8:1    0    1M  0 part
+└─sda2                       8:2    0   10G  0 part /
+sdb                          8:16   0    5G  0 disk
+└─sdb1                       8:17   0    2G  0 part
+  └─VolumeGroupTest-lvdata 253:0    0    2G  0 lvm
+sdc                          8:32   0   10G  0 disk
+sr0                         11:0    1 1024M  0 rom
+</pre>
+Le nouveau disque porte le nom **sdc**.
 
 ### 8. Utilisez la commande vgextend <nom_vg> <nom_pv> pour ajouter le nouveau disque au groupe de volumes
 
+<pre>
+root@serveur:~# vgextend VolumeGroupTest /dev/sdc
+  Physical volume "/dev/sdc" successfully created.
+  Volume group "VolumeGroupTest" successfully extended
+</pre>
+
 ### 9. Utilisez la commande lvresize (ou lvextend) pour agrandir le volume logique. Enfin, il ne faut pas oublier de redimensionner le système de fichiers à l’aide de la commande resize2fs. Il est possible d’aller beaucoup plus loin avec LVM, par exemple en créant des volumes par bandes (l’équivalent du RAID 0) ou du mirroring (RAID 1). Le but de cet exercice n’était que de présenter les fonctionnalités de base.
 
-## Exercice 3. Exécution de commandes en différé : at et cron
+<pre>
+root@serveur:~# lvresize -L +3G /dev/VolumeGroupTest/lvdata
+  Size of logical volume VolumeGroupTest/lvdata changed from <2,00 GiB (511 extents) to <5,00 GiB (1279 extents).
+  Logical volume VolumeGroupTest/lvdata successfully resized.
+</pre>
 
-### 1. Programmez une tâche qui affiche un rappel pour la réunion qui aura lieu dans 3 minutes. Vérifiez entre temps que la tâche est bien programmée.
-
-### 2. Est-ce que le message s’est affiché ? Si la réponse est non, essayez de trouver la cause du problème (par exemple en vous aidant des logs, du manuel...)
-
-### 3. Pour tester le fonctionnement de cron, commencez par programmer l’exécution d’une tâche simple, l’affichage de “Il faut réviser pour l’examen !”, toutes les 3 minutes.
-
-### 4. Programmez l’exécution d’une commande tous les jours, toute l’année, tous les quarts d’heure
-
-### 5. Programmez l’exécution d’une commande toutes les cinq minutes à partir de 2 (2, 7, 12, etc.) à 18 heures les 1er et 15 du mois :
-
-### 6. Programmez l’exécution d’une commande du lundi au vendredi à 17 heures
-
-### 7. Modifiez votre crontab pour que les messages ne soient plus envoyés par mail, mais redirigés dans un fichier de log situé dans votre dossier personnel
-
-### 8. Videz votre crontab
+<pre>
+root@serveur:~# lsblk
+NAME                       MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+loop0                        7:0    0   89M  1 loop /snap/core/7713
+loop1                        7:1    0 54,6M  1 loop /snap/lxd/11985
+loop2                        7:2    0 89,1M  1 loop /snap/core/7917
+loop3                        7:3    0 54,7M  1 loop /snap/lxd/12181
+sda                          8:0    0   10G  0 disk
+├─sda1                       8:1    0    1M  0 part
+└─sda2                       8:2    0   10G  0 part /
+sdb                          8:16   0    5G  0 disk
+└─sdb1                       8:17   0    2G  0 part
+  └─VolumeGroupTest-lvdata 253:0    0    5G  0 lvm
+sdc                          8:32   0   10G  0 disk
+└─VolumeGroupTest-lvdata   253:0    0    5G  0 lvm
+sr0                         11:0    1 1024M  0 rom
+</pre>
