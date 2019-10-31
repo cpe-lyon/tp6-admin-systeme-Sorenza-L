@@ -359,3 +359,54 @@ sdc                          8:32   0   10G  0 disk
 └─VolumeGroupTest-lvdata   253:0    0    5G  0 lvm
 sr0                         11:0    1 1024M  0 rom
 </pre>
+
+## Exercice 3. Exécution de commandes en différé : at et cron
+
+### 1. Programmez une tâche qui affiche un rappel pour la réunion qui aura lieu dans 3 minutes. Vérifiez entre temps que la tâche est bien programmée.
+
+<pre>
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user  command
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+*/3 3   * * *  echo "La réunion aura lieu dans 3 minutes." >>~/readme
+</pre>
+
+J'ai ajouté la ligne ***"*/3 3   * * *  echo "La réunion aura lieu dans 3 minutes." >> ~/readme"**
+
+### 2. Est-ce que le message s’est affiché ? Si la réponse est non, essayez de trouver la cause du problème (par exemple en vous aidant des logs, du manuel...)
+
+La réponse ne s'est pas affiché.
+
+### 3. Pour tester le fonctionnement de cron, commencez par programmer l’exécution d’une tâche simple, l’affichage de “Il faut réviser pour l’examen !”, toutes les 3 minutes.
+
+*/3 * * * * echo "Il faut réviser pour l'examen !"
+
+### 4. Programmez l’exécution d’une commande tous les jours, toute l’année, tous les quarts d’heure
+
+Tous les jours:
+> 0 0 * * * echo "Il faut réviser pour l'examen !" 
+Toute l'année:
+> 0 0 1 1 * echo "Il faut réviser l'examen !"
+Tous les quarts d'heure:
+> */15 * * * * echo "Il faut réviser l'examen !"
+
+### 5. Programmez l’exécution d’une commande toutes les cinq minutes à partir de 2 (2, 7, 12, etc.) à 18 heures les 1er et 15 du mois :
+
+### 6. Programmez l’exécution d’une commande du lundi au vendredi à 17 heures
+
+0 17 * * 1-5 echo "Il faut réviser l'examen !"
+
+### 7. Modifiez votre crontab pour que les messages ne soient plus envoyés par mail, mais redirigés dans un fichier de log situé dans votre dossier personnel
+
+### 8. Videz votre crontab
